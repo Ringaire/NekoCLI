@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "jsx": "react-jsx"
+  },
+  "references": [
+    { "path": "../core" },
+    { "path": "../providers" },
+    { "path": "../tools" }
+  ],
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

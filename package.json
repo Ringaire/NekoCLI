@@ -1,0 +1,20 @@
+{
+  "name": "nekocode",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "build:clean": "tsc -b tsconfig.json --clean && tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "dev": "tsc -b tsconfig.json --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@nekocode/cli",
+  "version": "0.1.0",
+  "description": "NekoCode CLI entrypoint - stdio adapter, TUI (Ink)",
+  "type": "module",
+  "bin": {
+    "neko": "./dist/bin.js",
+    "nekocode": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nekocode/core": "workspace:*",
+    "@nekocode/providers": "workspace:*",
+    "@nekocode/tools": "workspace:*",
+    "chalk": "^5.6.2",
+    "ink": "^7.0.4",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "typescript": "^5.7.0"
+  }
+}

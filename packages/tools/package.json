@@ -1,0 +1,36 @@
+{
+  "name": "@nekocode/tools",
+  "version": "0.1.0",
+  "description": "NekoCode built-in tools - Bash, FileRead, FileEdit, Glob, Grep, etc.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      ".": ["./src/index.ts"],
+      "*": ["./src/*.ts", "./src/*/index.ts"]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nekocode/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^5.7.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  }
+}

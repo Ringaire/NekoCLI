@@ -1,0 +1,39 @@
+{
+  "name": "@nekocode/providers",
+  "version": "0.1.0",
+  "description": "NekoCode LLM providers - Claude, OpenAI, Gemini, OpenAI-compatible",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": ["./src/index.ts"],
+      "*": ["./src/*.ts", "./src/*/index.ts"]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
+    "@google/genai": "^2.6.0",
+    "@nekocode/core": "workspace:*",
+    "openai": "^6.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^5.7.0"
+  }
+}
