@@ -57,3 +57,7 @@ packages/
 ## License
 
 AGPL-3.0 — See [LICENSE](LICENSE) for details.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
