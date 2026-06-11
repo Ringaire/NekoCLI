@@ -283,5 +283,5 @@ crates/
 
 **如果这个项目对你有帮助，请给个 Star ⭐**
 
-Made with ❤️ by Ringaire & OfficialNekoTeam
+Made with ❤️ by Ringaire玲汐
 </div>

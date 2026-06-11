@@ -283,5 +283,5 @@ AGPL-3.0 — See [LICENSE](LICENSE) for details.
 
 **If this project helps you, please give it a Star ⭐**
 
-Made with ❤️ by Ringaire & OfficialNekoTeam
+Made with ❤️ by Ringaire玲汐
 </div>
