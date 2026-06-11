@@ -1,0 +1,13 @@
+[build]
+rustflags = [
+    "--remap-path-prefix=/home/churanneko/=/",
+    "--remap-path-prefix=/home/churanneko/.cargo/=/cargo/",
+]
+
+[profile.release]
+# Strip paths and debug info from release binary
+# (individual profile settings are in workspace Cargo.toml)
+
+[env]
+# Prevent cargo from embedding home directory paths in panic messages
+CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_OPT_LEVEL = "3"
