@@ -82,7 +82,13 @@ export OPENAI_API_KEY="sk-xxx"
 export DEEPSEEK_API_KEY="sk-xxx"
 ```
 
-4. Run
+4. Install to system (recommended)
+```bash
+cargo install --path . --bin neko
+neko
+```
+
+5. Or run directly (no install)
 ```bash
 cargo run --release
 ```
