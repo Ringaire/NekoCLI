@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use uuid::Uuid;
 
 use super::markdown::render_markdown;
+use crate::tui::theme::{ACCENT, ERR, MAIN, MUTED, THINK as THINK_COLOR, UI};
 
 /// AI / 工具圆点（`⏺` 仅 macOS，Linux 用 `●`）。
 const BULLET: &str = "●";
@@ -17,9 +18,7 @@ const POINTER: &str = "❯";
 /// 工具输出连接符 (U+23BF)。
 const ELBOW: &str = "⎿";
 /// 思考指示符。
-const THINK: &str = "✻";
-
-use crate::tui::theme::ACCENT_ORANGE;
+const THINK_SYM: &str = "✻";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BubbleKind {
@@ -212,13 +211,14 @@ impl ChatWidget {
 
     // ── 渲染 ──────────────────────────────────────────────────────────────────
 
-    /// 当前内容按 `width` 软换行后的总行数（供布局顶部对齐时测高）。
+    /// 当前内容按 `width` 软换行后的总行数。
     pub fn content_height(&self, width: u16, show_reasoning: bool) -> usize {
-        self.build_lines(width.max(1) as usize, show_reasoning).len()
+        self.build_lines(width.max(1) as usize, show_reasoning, None).len()
     }
 
     /// 构建全部可视行（不做视口截断）。
-    fn build_lines(&self, width: usize, show_reasoning: bool) -> Vec<Line<'static>> {
+    /// `filter_sub`：仅显示指定子 agent 的气泡（None = 全部显示）。
+    fn build_lines(&self, width: usize, show_reasoning: bool, filter_sub: Option<Uuid>) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         for b in &self.bubbles {
@@ -226,13 +226,19 @@ impl ChatWidget {
             if !show_reasoning && b.kind == BubbleKind::Reasoning {
                 continue;
             }
+            // 子 agent 视图过滤
+            if let Some(filter) = filter_sub {
+                if b.sub_agent != Some(filter) && b.kind != BubbleKind::System && b.sub_agent.is_some() {
+                    continue;
+                }
+            }
             let (indent, indent_w): (&'static str, usize) =
                 if b.sub_agent.is_some() { ("  ┆ ", 4) } else { ("", 0) };
 
             // 行首：可选子 agent 缩进。
             let lead = |spans: &mut Vec<Span<'static>>| {
                 if !indent.is_empty() {
-                    spans.push(Span::styled(indent, Style::default().fg(Color::DarkGray)));
+                    spans.push(Span::styled(indent, Style::default().fg(MUTED)));
                 }
             };
 
@@ -246,12 +252,12 @@ impl ChatWidget {
                         if i == 0 {
                             spans.push(Span::styled(
                                 format!("{} ", POINTER),
-                                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                                Style::default().fg(UI).add_modifier(Modifier::BOLD),
                             ));
                         } else {
                             spans.push(Span::raw("  "));
                         }
-                        spans.push(Span::styled(wline.clone(), Style::default().fg(Color::White)));
+                        spans.push(Span::styled(wline.clone(), Style::default().fg(MAIN)));
                         lines.push(Line::from(spans));
                     }
                     lines.push(Line::from(""));
@@ -267,7 +273,7 @@ impl ChatWidget {
                         if i == 0 {
                             spans.push(Span::styled(
                                 format!("{} ", BULLET),
-                                Style::default().fg(ACCENT_ORANGE).add_modifier(Modifier::BOLD),
+                                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
                             ));
                         } else {
                             spans.push(Span::raw("  "));
@@ -282,31 +288,31 @@ impl ChatWidget {
                 BubbleKind::Tool => {
                     let mut spans = Vec::new();
                     lead(&mut spans);
-                    spans.push(Span::styled(format!("{} ", BULLET), Style::default().fg(ACCENT_ORANGE)));
+                    spans.push(Span::styled(format!("{} ", BULLET), Style::default().fg(ACCENT)));
                     spans.push(Span::styled(
                         b.label.clone(),
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                        Style::default().fg(MAIN).add_modifier(Modifier::BOLD),
                     ));
                     if !b.content.is_empty() {
                         let avail = width.saturating_sub(indent_w + b.label.width() + 4);
                         let prev = truncate_display(&b.content, avail);
-                        spans.push(Span::styled(format!("({})", prev), Style::default().fg(Color::DarkGray)));
+                        spans.push(Span::styled(format!("({})", prev), Style::default().fg(MUTED)));
                     }
                     lines.push(Line::from(spans));
 
                     // 结果行
                     let (txt, col) = if b.tool_done {
                         if b.tool_ok {
-                            (format!("{}ms", b.tool_ms), Color::DarkGray)
+                            (format!("{}ms", b.tool_ms), MUTED)
                         } else {
-                            (format!("error · {}ms", b.tool_ms), Color::Red)
+                            (format!("error · {}ms", b.tool_ms), ERR)
                         }
                     } else {
-                        ("running…".to_string(), Color::DarkGray)
+                        ("running…".to_string(), MUTED)
                     };
                     let mut s2 = Vec::new();
                     lead(&mut s2);
-                    s2.push(Span::styled(format!("  {}  ", ELBOW), Style::default().fg(Color::DarkGray)));
+                    s2.push(Span::styled(format!("  {}  ", ELBOW), Style::default().fg(MUTED)));
                     s2.push(Span::styled(txt, Style::default().fg(col)));
                     lines.push(Line::from(s2));
 
@@ -318,14 +324,14 @@ impl ChatWidget {
                                 let mut s = Vec::new();
                                 lead(&mut s);
                                 s.push(Span::raw("     "));
-                                s.push(Span::styled(truncate_display(&l, avail), Style::default().fg(Color::DarkGray)));
+                                s.push(Span::styled(truncate_display(&l, avail), Style::default().fg(MUTED)));
                                 lines.push(Line::from(s));
                             }
                             for l in last_lines(stderr, 3) {
                                 let mut s = Vec::new();
                                 lead(&mut s);
                                 s.push(Span::raw("     "));
-                                s.push(Span::styled(truncate_display(&l, avail), Style::default().fg(Color::Red).add_modifier(Modifier::DIM)));
+                                s.push(Span::styled(truncate_display(&l, avail), Style::default().fg(ERR).add_modifier(Modifier::DIM)));
                                 lines.push(Line::from(s));
                             }
                         }
@@ -340,7 +346,7 @@ impl ChatWidget {
                         lead(&mut spans);
                         spans.push(Span::styled(
                             wline,
-                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
                         ));
                         lines.push(Line::from(spans));
                     }
@@ -353,11 +359,11 @@ impl ChatWidget {
                         let mut spans = Vec::new();
                         lead(&mut spans);
                         if i == 0 {
-                            spans.push(Span::styled(format!("  {}  ", ELBOW), Style::default().fg(Color::Red)));
+                            spans.push(Span::styled(format!("  {}  ", ELBOW), Style::default().fg(ERR)));
                         } else {
                             spans.push(Span::raw("     "));
                         }
-                        spans.push(Span::styled(wline.clone(), Style::default().fg(Color::Red)));
+                        spans.push(Span::styled(wline.clone(), Style::default().fg(ERR)));
                         lines.push(Line::from(spans));
                     }
                     lines.push(Line::from(""));
@@ -369,8 +375,8 @@ impl ChatWidget {
                     let mut head = Vec::new();
                     lead(&mut head);
                     head.push(Span::styled(
-                        format!("{} Thinking… ({} chars)", THINK, nchars),
-                        Style::default().fg(Color::Magenta).add_modifier(Modifier::DIM),
+                        format!("{} Thinking… ({} chars)", THINK_SYM, nchars),
+                        Style::default().fg(THINK_COLOR).add_modifier(Modifier::DIM),
                     ));
                     lines.push(Line::from(head));
 
@@ -381,7 +387,7 @@ impl ChatWidget {
                         s2.push(Span::raw("  "));
                         s2.push(Span::styled(
                             format!("{}…", preview),
-                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
                         ));
                         lines.push(Line::from(s2));
                     }
@@ -391,10 +397,10 @@ impl ChatWidget {
                 BubbleKind::Spawn => {
                     let mut spans = Vec::new();
                     lead(&mut spans);
-                    spans.push(Span::styled("⟳ ", Style::default().fg(Color::Magenta)));
+                    spans.push(Span::styled("⟳ ", Style::default().fg(THINK_COLOR)));
                     spans.push(Span::styled(
                         b.content.clone(),
-                        Style::default().fg(Color::Magenta).add_modifier(Modifier::DIM),
+                        Style::default().fg(THINK_COLOR).add_modifier(Modifier::DIM),
                     ));
                     lines.push(Line::from(spans));
                 }
@@ -406,10 +412,11 @@ impl ChatWidget {
 
     /// 渲染为 Paragraph（无边框）。只渲染能塞进 area 的末尾行数，保证最新内容可见。
     /// `show_reasoning` 控制是否展示 thinking/reasoning 气泡。
-    pub fn render(&self, area: Rect, show_reasoning: bool) -> Paragraph<'static> {
+    /// `filter_sub`：仅显示指定子 agent 的气泡（None = 全部显示）。
+    pub fn render(&self, area: Rect, show_reasoning: bool, filter_sub: Option<Uuid>) -> Paragraph<'static> {
         let width = area.width.max(1) as usize;
         let max_lines = area.height as usize;
-        let mut lines = self.build_lines(width, show_reasoning);
+        let mut lines = self.build_lines(width, show_reasoning, filter_sub);
 
         // 保留视口范围内的行；scroll_offset > 0 时向上偏移（鼠标滚轮浏览历史）
         if lines.len() > max_lines {

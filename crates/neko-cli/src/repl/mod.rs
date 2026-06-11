@@ -117,7 +117,7 @@ pub async fn run_plain(mut runtime: BootstrappedRuntime, args: &Args) -> Result<
             CommandOutcome::Quit => break,
             CommandOutcome::Handled => {
                 let trimmed = input.trim();
-                if trimmed == "/sessions" || trimmed == "/ls" {
+                if trimmed == "/sessions" || trimmed == "/ls" || trimmed == "/resume" {
                     commands::list_sessions().await?;
                 } else if let Some(rest) = trimmed.strip_prefix("/memory").or_else(|| trimmed.strip_prefix("/mem")) {
                     commands::handle_memory(rest.trim()).await?;

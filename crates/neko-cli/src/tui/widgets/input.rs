@@ -1,17 +1,17 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
+
+use crate::tui::theme::{mode_color, MUTED};
 use unicode_width::UnicodeWidthStr;
 
 /// 输入提示符（pointer），由模式决定颜色。
 const PROMPT: &str = "❯ ";
 /// 提示符显示宽度。
 const PROMPT_W: u16 = 2;
-
-use crate::tui::theme::mode_color;
 
 /// 多行文本输入控件，带光标定位与字节级游标管理。
 pub struct InputWidget {
@@ -144,7 +144,7 @@ impl InputWidget {
     /// 长行按 `inner_width` 软换行，避免溢出。
     /// `ghost`：行内幽灵补全后缀（灰字，可空）。`arg_hint`：命令参数提示。
     pub fn render(&self, mode: &str, ghost: &str, arg_hint: Option<&str>, inner_width: u16) -> Paragraph<'static> {
-        let accent = if self.disabled { Color::DarkGray } else { mode_color(mode) };
+        let accent = if self.disabled { MUTED } else { mode_color(mode) };
         let cont = " ".repeat(PROMPT_W as usize); // 续行缩进与 `❯ ` 对齐
         let w = Self::text_width(inner_width);
 
@@ -178,10 +178,10 @@ impl InputWidget {
         if !self.disabled {
             if let Some(last) = lines.last_mut() {
                 if !ghost.is_empty() {
-                    last.spans.push(Span::styled(ghost.to_string(), Style::default().fg(Color::DarkGray)));
+                    last.spans.push(Span::styled(ghost.to_string(), Style::default().fg(MUTED)));
                 }
                 if let Some(h) = arg_hint {
-                    last.spans.push(Span::styled(format!(" {}", h), Style::default().fg(Color::DarkGray)));
+                    last.spans.push(Span::styled(format!(" {}", h), Style::default().fg(MUTED)));
                 }
             }
         }

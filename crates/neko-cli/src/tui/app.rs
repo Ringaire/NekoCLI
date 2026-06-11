@@ -34,16 +34,27 @@ use super::widgets::{
     model_picker::ModelPickerModal,
     permission::PermissionModal,
     provider_setup::{ProviderRow, ProviderSetupModal, SetupAction},
+    session_picker::{SessionEntry, SessionPickerModal},
     suggestions,
     tasks,
-    welcome::{render_welcome, welcome_height},
+    welcome::render_welcome,
 };
-use super::theme::SPINNER;
+use super::theme::{SPINNER, MUTED, ERR, WARN};
 
 /// 待处理的权限请求：UI 数据 + 回应通道。
 struct PendingPermission {
     modal:     PermissionModal,
     responder: tokio::sync::oneshot::Sender<PermissionDecision>,
+}
+
+/// 子 agent 树中已注册的 sub_agent_id 列表
+fn sub_agent_ids(chat: &ChatWidget) -> Vec<uuid::Uuid> {
+    let mut ids: Vec<uuid::Uuid> = chat.bubbles.iter()
+        .filter_map(|b| b.sub_agent)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 struct AppState {
@@ -68,6 +79,8 @@ struct AppState {
     tasks:            Vec<super::widgets::tasks::TodoView>,
     show_tasks:       bool,
     tasks_auto_shown: bool,
+    /// 会话选择器浮层。
+    session_picker:   Option<SessionPickerModal>,
     /// 当前 `/` 命令补全建议（空 = 不显示）。
     suggestions:      Vec<crate::repl::commands::Suggestion>,
     /// 选中的建议索引。
@@ -83,6 +96,8 @@ struct AppState {
     queued_messages:  Vec<String>,
     /// Ctrl+C 首次按下后进入 pending 态，再次按下才退出
     exit_pending:     bool,
+    /// 当前选中的子 agent 视图（None = 主 agent）
+    active_sub_agent: Option<uuid::Uuid>,
 }
 
 impl AppState {
@@ -117,6 +132,7 @@ impl AppState {
             tasks:            Vec::new(),
             show_tasks:       false,
             tasks_auto_shown: false,
+            session_picker:   None,
             suggestions:      Vec::new(),
             suggestion_idx:   0,
             show_token_count,
@@ -125,6 +141,7 @@ impl AppState {
             think_budget:     DEFAULT_THINKING_BUDGET,
             queued_messages:  Vec::new(),
             exit_pending:     false,
+            active_sub_agent: None,
         }
     }
 
@@ -395,7 +412,7 @@ async fn handle_term_event(
 ) -> Control {
     match ev {
         Event::Paste(text) => {
-            if !state.is_running && state.pending.is_none() && state.model_picker.is_none()
+            if state.pending.is_none() && state.model_picker.is_none()
                 && state.provider_setup.is_none()
             {
                 state.input.insert_str(&text);
@@ -411,6 +428,10 @@ async fn handle_term_event(
             // /connect 向导优先处理按键
             if state.provider_setup.is_some() {
                 return handle_provider_setup_key(ke, runtime, ctx, state, setup_tx).await;
+            }
+            // 会话选择器优先处理按键
+            if state.session_picker.is_some() {
+                return handle_session_picker_key(ke, runtime, ctx, state).await;
             }
             // 模型选择器优先处理按键
             if state.model_picker.is_some() {
@@ -444,19 +465,20 @@ async fn handle_permission_key(ke: KeyEvent, runtime: &BootstrappedRuntime, stat
         _ => {}
     }
 
-    // 选择：1/2/3 跳选并提交；Enter 提交当前；Esc = No
     let choice: Option<usize> = match ke.code {
         KeyCode::Char('1') => Some(0),
         KeyCode::Char('2') => Some(1),
         KeyCode::Char('3') => Some(2),
+        KeyCode::Char('4') => Some(3),
         KeyCode::Enter     => state.pending.as_ref().map(|p| p.modal.cursor()),
-        KeyCode::Esc       => Some(2),
+        KeyCode::Esc       => Some(3),
         _ => None,
     };
 
     if let Some(idx) = choice {
         if let Some(p) = state.pending.take() {
             let tool = p.modal.tool_name.clone();
+            let command = p.modal.preview.clone();
             let decision = match idx {
                 0 => PermissionDecision::AllowOnce,
                 1 => PermissionDecision::AllowAlways,
@@ -464,8 +486,9 @@ async fn handle_permission_key(ke: KeyEvent, runtime: &BootstrappedRuntime, stat
             };
             let _ = p.responder.send(decision);
             if idx == 1 {
-                runtime.permissions.lock().await.allow(tool, None);
-                state.chat.add_system("permission granted (always)");
+                let cmd = if command.is_empty() { None } else { Some(command.clone()) };
+                runtime.permissions.lock().await.allow(&tool, cmd);
+                state.chat.add_system("permission granted (always for this command)");
             }
         }
     }
@@ -498,6 +521,39 @@ async fn handle_model_picker_key(
         }
         KeyCode::Esc => {
             state.model_picker = None;
+        }
+        _ => {}
+    }
+    Control::Continue
+}
+
+/// 会话选择器按键处理。
+async fn handle_session_picker_key(
+    ke:      KeyEvent,
+    runtime: &mut BootstrappedRuntime,
+    ctx:     &Arc<TokioMutex<AgentContext>>,
+    state:   &mut AppState,
+) -> Control {
+    match ke.code {
+        KeyCode::Up => {
+            if let Some(picker) = &mut state.session_picker {
+                picker.move_up();
+            }
+        }
+        KeyCode::Down => {
+            if let Some(picker) = &mut state.session_picker {
+                picker.move_down();
+            }
+        }
+        KeyCode::Enter => {
+            if let Some(picker) = state.session_picker.take() {
+                if let Some(id) = picker.selected_id() {
+                    resume_session_tui(runtime, ctx, state, id).await;
+                }
+            }
+        }
+        KeyCode::Esc => {
+            state.session_picker = None;
         }
         _ => {}
     }
@@ -823,6 +879,23 @@ async fn handle_key(
             if !state.suggestions.is_empty() {
                 let n = state.suggestions.len();
                 state.suggestion_idx = (state.suggestion_idx + 1) % n;
+            } else if state.is_running {
+                let ids = sub_agent_ids(&state.chat);
+                if !ids.is_empty() {
+                    let next = match state.active_sub_agent {
+                        None => Some(ids[0]),
+                        Some(id) => {
+                            if let Some(pos) = ids.iter().position(|x| *x == id) {
+                                if pos + 1 < ids.len() { Some(ids[pos + 1]) } else { None }
+                            } else {
+                                Some(ids[0])
+                            }
+                        }
+                    };
+                    state.active_sub_agent = next;
+                    state.status_msg = next.map(|id| format!("sub-agent {}", &id.to_string()[..8]))
+                        .or_else(|| Some("main agent".into()));
+                }
             } else if let Some(next) = history.next() {
                 state.input.set(next);
             }
@@ -940,17 +1013,27 @@ async fn handle_command(
             state.chat.add_system("compact is available in plain mode (--no-tui) for now");
             CmdResult::Handled
         }
-        CommandOutcome::Resume(_) => {
-            state.chat.add_system("use --resume <id> at launch to resume a session");
+        CommandOutcome::Resume(id) => {
+            resume_session_tui(runtime, ctx, state, id).await;
             CmdResult::Handled
         }
         CommandOutcome::Quit => CmdResult::Quit,
         CommandOutcome::Handled => {
             let trimmed = text.trim();
-            if trimmed == "/sessions" || trimmed == "/ls" {
-                for line in crate::repl::commands::session_lines().await {
-                    state.chat.add_system(line);
-                }
+            if trimmed == "/sessions" || trimmed == "/ls" || trimmed == "/resume" {
+                let sessions = neko_core::session::list_sessions().await;
+                let entries: Vec<SessionEntry> = sessions.into_iter().map(|s| {
+                    let when = chrono::DateTime::from_timestamp_millis(s.updated_at)
+                        .map(|d: chrono::DateTime<chrono::Utc>| d.format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_else(|| "-".to_string());
+                    SessionEntry {
+                        id: s.id,
+                        title: s.title.unwrap_or_default(),
+                        message_count: s.message_count,
+                        updated_at: when,
+                    }
+                }).collect();
+                state.session_picker = Some(SessionPickerModal::new(entries));
             } else if let Some(rest) = trimmed.strip_prefix("/memory").or_else(|| trimmed.strip_prefix("/mem")) {
                 let rest = rest.trim();
                 let entries = if let Some(q) = rest.strip_prefix("search").map(|s| s.trim()).filter(|s| !s.is_empty()) {
@@ -1040,7 +1123,6 @@ async fn start_turn(
     state.signal = Some(signal.clone());
     state.is_running = true;
     state.is_thinking = true;
-    state.input.disabled = true;
     state.status_msg = None;
     state.turn_start_ms = Some(chrono::Utc::now().timestamp_millis());
 
@@ -1065,7 +1147,6 @@ async fn start_turn(
 fn finish_turn(state: &mut AppState, result: TurnResult) {
     state.is_running  = false;
     state.is_thinking = false;
-    state.input.disabled = false;
     state.signal = None;
     state.chat.end_turn();
     state.turn_start_ms = None;
@@ -1080,147 +1161,145 @@ fn finish_turn(state: &mut AppState, result: TurnResult) {
     state.status_msg = None;
 }
 
+/// 恢复指定会话：加载消息、替换 chat 气泡与运行时会话。
+async fn resume_session_tui(
+    runtime: &mut BootstrappedRuntime,
+    ctx:     &Arc<TokioMutex<AgentContext>>,
+    state:   &mut AppState,
+    id:      uuid::Uuid,
+) {
+    match neko_core::session::load_session(id).await {
+        Some(s) => {
+            let messages = {
+                let mut guard = ctx.lock().await;
+                let new_ctx = crate::agent::AgentContext::from_session(
+                    &s,
+                    runtime.model.clone(),
+                    Some(runtime.system_prompt.clone()),
+                );
+                *guard = new_ctx;
+                guard.messages.clone()
+            };
+            runtime.session = s;
+            state.chat = ChatWidget::new();
+            state.load_history_messages(&messages);
+            state.chat.add_system(format!(
+                "Resumed session {} ({} messages)", id, messages.len()
+            ));
+        }
+        None => {
+            state.chat.add_system(format!("Session {} not found", id));
+        }
+    }
+}
+
 fn draw<B: ratatui::backend::Backend>(term: &mut Terminal<B>, state: &mut AppState) -> Result<()> {
     term.draw(|frame| {
         let area = frame.area();
-        // 视觉行数需按当前宽度软换行后计算（长行会折成多行）。
         let input_lines = state.input.visual_line_count(area.width);
-        // chat 内容高度（welcome 或消息）：用于顶部对齐布局，内容短时不留大间隙。
-        let show_welcome = !state.chat.has_conversation();
-        let content_lines = if show_welcome {
-            welcome_height(&state.model, &state.mode, &state.cwd) as u16
-        } else {
-            state.chat.content_height(area.width, state.think_show) as u16
-        };
-        let layout = AppLayout::compute(area, content_lines, input_lines);
+        let layout = AppLayout::compute(area, input_lines);
 
-        // chat area: show welcome banner when no real conversation yet (system-only or empty)
+        // chat area
+        let show_welcome = !state.chat.has_conversation();
         if show_welcome {
             frame.render_widget(
                 render_welcome(&state.model, &state.mode, &state.cwd),
                 layout.chat,
             );
         } else {
-            let chat_widget = state.chat.render(layout.chat, state.think_show);
+            let chat_widget = state.chat.render(layout.chat, state.think_show, state.active_sub_agent);
             frame.render_widget(chat_widget, layout.chat);
         }
 
-        // input box（带行内幽灵补全 + 参数提示）
+        // input box
         let ghost = crate::repl::commands::inline_ghost(&state.input.value, &state.suggestions);
         let arg_hint = crate::repl::commands::argument_hint(&state.input.value);
         frame.render_widget(state.input.render(&state.mode, &ghost, arg_hint, layout.input.width), layout.input);
 
-        // footer（对标 Claude Code 输入框下方的 info 行：左侧模式/模型/状态，右侧 token/快捷键）
+        // footer（状态栏，输入框下方紧凑行）
         {
-            use ratatui::style::Modifier;
-            use ratatui::widgets::{Block, BorderType, Borders};
             use unicode_width::UnicodeWidthStr;
 
+            let dim = ratatui::style::Style::default().fg(MUTED);
+            let bold_dim = dim.add_modifier(ratatui::style::Modifier::BOLD);
             let mcolor = super::theme::mode_color(&state.mode);
+            let max_w = layout.footer.width as usize;
 
-            // ── 左侧 ───────────────────────────────────────────────────────────
-            let mut left_spans = vec![
-                ratatui::text::Span::styled(
-                    format!(" ⏵⏵ {}", state.mode),
-                    ratatui::style::Style::default().fg(mcolor).add_modifier(Modifier::BOLD),
-                ),
-                ratatui::text::Span::styled(
-                    format!(" · {}", state.model),
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ),
-            ];
+            let mut spans: Vec<ratatui::text::Span<'static>> = Vec::new();
+
+            let mode_s = format!("⏵⏵ {}", state.mode);
+            spans.push(ratatui::text::Span::styled(mode_s, bold_dim.fg(mcolor)));
+            spans.push(ratatui::text::Span::styled(" · ".to_string(), dim));
+
+            spans.push(ratatui::text::Span::styled(state.model.clone(), dim));
 
             if state.is_running {
                 let spin = SPINNER[state.spinner_idx % SPINNER.len()];
-                left_spans.push(ratatui::text::Span::styled(
-                    format!(" · {} working", spin),
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ));
+                spans.push(ratatui::text::Span::styled(format!(" · {} working", spin), dim));
             }
             if state.skip_perms {
-                left_spans.push(ratatui::text::Span::styled(
-                    " · skip-perm",
-                    ratatui::style::Style::default().fg(ratatui::style::Color::Red),
-                ));
+                spans.push(ratatui::text::Span::styled(" · skip-perm".to_string(), dim.fg(ERR)));
             }
             if let Some(ref msg) = state.status_msg {
-                left_spans.push(ratatui::text::Span::styled(
-                    format!(" · {}", msg),
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ));
+                spans.push(ratatui::text::Span::styled(format!(" · {}", msg), dim));
             }
-
-            // ── 右侧 ───────────────────────────────────────────────────────────
-            let mut right_spans: Vec<ratatui::text::Span> = Vec::new();
 
             if state.show_token_count && state.tokens > 0 && state.context_window > 0 {
                 let pct = state.tokens as f64 / state.context_window as f64 * 100.0;
-                let tc = if pct >= 85.0 {
-                    ratatui::style::Color::Red
-                } else if pct >= 70.0 {
-                    ratatui::style::Color::Yellow
+                let tc = if pct >= 85.0 { ERR }
+                    else if pct >= 70.0 { WARN }
+                    else { MUTED };
+                let tokens_k = state.tokens as f64 / 1000.0;
+                let token_str = if tokens_k >= 1000.0 {
+                    format!("{:.1}M", tokens_k / 1000.0)
                 } else {
-                    ratatui::style::Color::DarkGray
+                    format!("{:.0}k", tokens_k)
                 };
-                right_spans.push(ratatui::text::Span::styled(
-                    format!("{:.0}%", pct),
-                    ratatui::style::Style::default().fg(tc),
-                ));
-                right_spans.push(ratatui::text::Span::styled(
-                    " · ",
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ));
+                spans.push(ratatui::text::Span::styled(
+                    format!(" · {}({:.0}%)", token_str, pct), dim.fg(tc)));
             }
 
-            let (pending_t, in_prog_t, done_t) = tasks::counts(&state.tasks);
-            if pending_t + in_prog_t + done_t > 0 {
-                right_spans.push(ratatui::text::Span::styled(
-                    format!("✔{} ◼{} ◻{}", done_t, in_prog_t, pending_t),
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ));
-                right_spans.push(ratatui::text::Span::styled(
-                    " · ",
-                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                ));
+            let mut right = String::new();
+            let (_, in_prog_t, _) = tasks::counts(&state.tasks);
+            if in_prog_t > 0 {
+                right.push_str(&format!(" ◼{} · ", in_prog_t));
+            }
+            if !state.queued_messages.is_empty() {
+                right.push_str(&format!(" queued({}) · ", state.queued_messages.len()));
+            }
+            right.push_str("Tab ↻ mode");
+            if !sub_agent_ids(&state.chat).is_empty() {
+                right.push_str(" · ↓ agent");
+            }
+            right.push_str(" · ? help");
+
+            let right_w = right.width();
+            let used: usize = spans.iter().map(|s| s.content.width()).sum();
+            if used + right_w + 2 <= max_w {
+                let pad = max_w - used - right_w;
+                spans.push(ratatui::text::Span::raw(" ".repeat(pad)));
+                spans.push(ratatui::text::Span::styled(right, dim));
             }
 
-            right_spans.push(ratatui::text::Span::styled(
-                "Tab ↻ mode",
-                ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-            ));
-
-            // ── 拼接 ───────────────────────────────────────────────────────────
-            let left_w: usize = left_spans.iter().map(|s| s.content.width()).sum();
-            let right_w: usize = right_spans.iter().map(|s| s.content.width()).sum();
-            let pad = (layout.footer.width as usize).saturating_sub(left_w + right_w + 2);
-
-            let mut spans = left_spans;
-            spans.push(ratatui::text::Span::raw(" ".repeat(pad)));
-            spans.extend(right_spans);
-
-            let line = ratatui::text::Line::from(spans);
             frame.render_widget(
-                ratatui::widgets::Paragraph::new(line).block(
-                    Block::default()
-                        .borders(Borders::TOP)
-                        .border_type(BorderType::Plain)
-                        .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray)),
-                ),
+                ratatui::widgets::Paragraph::new(ratatui::text::Line::from(spans)),
                 layout.footer,
             );
         }
 
         // cursor
-        if !state.is_running && state.pending.is_none() && state.model_picker.is_none()
-            && state.provider_setup.is_none()
+        if state.pending.is_none() && state.session_picker.is_none()
+            && state.model_picker.is_none() && state.provider_setup.is_none()
         {
             let (cx, cy) = state.input.cursor_screen_pos(layout.input);
             frame.set_cursor_position((cx, cy));
         }
 
-        // 输入框上方浮层优先级：权限 > 命令补全 > 任务面板
+        // 浮层
         let show_suggestions = !state.suggestions.is_empty() && state.pending.is_none()
-            && state.model_picker.is_none() && state.provider_setup.is_none() && !state.is_running;
+            && state.session_picker.is_none() && state.model_picker.is_none()
+            && state.provider_setup.is_none();
+
         if state.pending.is_none() && !show_suggestions
             && state.show_tasks && !state.tasks.is_empty()
         {
@@ -1229,7 +1308,6 @@ fn draw<B: ratatui::backend::Backend>(term: &mut Terminal<B>, state: &mut AppSta
             frame.render_widget(tasks::render(&state.tasks), panel_area);
         }
 
-        // 命令补全下拉
         if show_suggestions {
             let sg_area = suggestions::area(area, layout.input.y, state.suggestions.len());
             frame.render_widget(ratatui::widgets::Clear, sg_area);
@@ -1239,14 +1317,15 @@ fn draw<B: ratatui::backend::Backend>(term: &mut Terminal<B>, state: &mut AppSta
             );
         }
 
-        // permission select — 锚定输入框上方
+        // permission select
         if let Some(p) = &state.pending {
-            let modal_area = PermissionModal::area(area, layout.input.y);
+            let h = p.modal.height();
+            let modal_area = PermissionModal::area(area, layout.input.y, h);
             frame.render_widget(PermissionModal::clear(), modal_area);
             frame.render_widget(p.modal.render(), modal_area);
         }
 
-        // 模型选择器 — 锚定输入框上方
+        // 模型选择器
         if let Some(picker) = &state.model_picker {
             let h = picker.height();
             let picker_area = ModelPickerModal::area(area, layout.input.y, h);
@@ -1254,7 +1333,15 @@ fn draw<B: ratatui::backend::Backend>(term: &mut Terminal<B>, state: &mut AppSta
             frame.render_widget(picker.render(), picker_area);
         }
 
-        // /connect 向导 — 锚定输入框上方
+        // 会话选择器
+        if let Some(picker) = &state.session_picker {
+            let h = picker.height();
+            let picker_area = SessionPickerModal::area(area, layout.input.y, h);
+            frame.render_widget(SessionPickerModal::clear(), picker_area);
+            frame.render_widget(picker.render(), picker_area);
+        }
+
+        // /connect 向导
         if let Some(setup) = &state.provider_setup {
             let h = setup.height();
             let setup_area = ProviderSetupModal::area(area, layout.input.y, h);

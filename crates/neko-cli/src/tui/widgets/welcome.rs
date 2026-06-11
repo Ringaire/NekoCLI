@@ -1,12 +1,12 @@
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-use crate::tui::theme::{mode_color, ACCENT_ORANGE};
+use crate::tui::theme::{mode_color, ACCENT, MAIN, MUTED, UI};
 
 fn mode_desc(mode: &str) -> &'static str {
     match mode {
@@ -38,26 +38,26 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     // ── cat + header ──────────────────────────────────────────────────────────
     // 猫占 3 行，右侧信息同行排列
     lines.push(Line::from(vec![
-        Span::styled("  /\\  /\\   ", Style::default().fg(Color::Cyan)),
-        Span::styled("✻ ", Style::default().fg(ACCENT_ORANGE)),
-        Span::styled("Welcome to NekoCode", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" v{VERSION}"), Style::default().fg(Color::DarkGray)),
+        Span::styled("  /\\  /\\   ", Style::default().fg(UI)),
+        Span::styled("✻ ", Style::default().fg(ACCENT)),
+        Span::styled("Welcome to NekoCode", Style::default().fg(UI).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" v{VERSION}"), Style::default().fg(MUTED)),
     ]));
     lines.push(Line::from(vec![
-        Span::styled(" ( o  o )  ", Style::default().fg(Color::Cyan)),
-        Span::styled("Model   ", Style::default().fg(Color::DarkGray)),
-        Span::styled(model, Style::default().fg(Color::White)),
+        Span::styled(" ( o  o )  ", Style::default().fg(UI)),
+        Span::styled("Model   ", Style::default().fg(MUTED)),
+        Span::styled(model, Style::default().fg(MAIN)),
     ]));
     lines.push(Line::from(vec![
-        Span::styled("  \\ ^^ /   ", Style::default().fg(Color::Cyan)),
-        Span::styled("Mode    ", Style::default().fg(Color::DarkGray)),
+        Span::styled("  \\ ^^ /   ", Style::default().fg(UI)),
+        Span::styled("Mode    ", Style::default().fg(MUTED)),
         Span::styled(mode_s.to_uppercase(), Style::default().fg(mcolor).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("  {}", mdesc), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("  {}", mdesc), Style::default().fg(MUTED)),
     ]));
     lines.push(Line::from(vec![
         Span::styled("           ", Style::default()),
-        Span::styled("CWD     ", Style::default().fg(Color::DarkGray)),
-        Span::styled(cwd_s, Style::default().fg(Color::White)),
+        Span::styled("CWD     ", Style::default().fg(MUTED)),
+        Span::styled(cwd_s, Style::default().fg(MAIN)),
     ]));
 
     lines.push(Line::from(""));
@@ -65,7 +65,7 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     // ── Quick start ───────────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  Quick start",
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+        Style::default().fg(MUTED).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -78,8 +78,8 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     ];
     for (key, desc) in tips {
         lines.push(Line::from(vec![
-            Span::styled(format!("    {:<22}", key), Style::default().fg(Color::Cyan)),
-            Span::styled(desc.to_string(), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("    {:<22}", key), Style::default().fg(UI)),
+            Span::styled(desc.to_string(), Style::default().fg(MUTED)),
         ]));
     }
 
@@ -88,7 +88,7 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     // ── Commands ──────────────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  Commands  (/ to see all)",
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+        Style::default().fg(MUTED).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -103,8 +103,8 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     for chunk in cmds.chunks(2) {
         let mut spans = vec![Span::raw("    ")];
         for (name, desc) in chunk {
-            spans.push(Span::styled(format!("{:<12}", name), Style::default().fg(Color::Cyan)));
-            spans.push(Span::styled(format!("{:<28}", desc), Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(format!("{:<12}", name), Style::default().fg(UI)));
+            spans.push(Span::styled(format!("{:<28}", desc), Style::default().fg(MUTED)));
         }
         lines.push(Line::from(spans));
     }
@@ -114,11 +114,11 @@ fn welcome_lines(model: &str, mode: &str, cwd: &str) -> Vec<Line<'static>> {
     // ── Separator ─────────────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         format!("  {}", "─".repeat(52)),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(MUTED),
     )));
     lines.push(Line::from(Span::styled(
         "  Start typing to chat  ·  / for commands  ·  Tab to switch mode",
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(MUTED),
     )));
 
     lines

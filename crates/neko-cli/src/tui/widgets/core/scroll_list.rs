@@ -8,9 +8,11 @@
 
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
 };
+
+use crate::tui::theme::{UI, INACTIVE};
 
 /// 单行渲染时的瞬时状态（props 的一部分，传给行渲染闭包）。
 #[derive(Clone, Copy)]
@@ -122,15 +124,15 @@ pub fn anchor_above(parent: Rect, input_y: u16, h: u16) -> Rect {
 /// `❯ ` 焦点指针（选中时），否则两空格占位。
 pub fn pointer(selected: bool) -> Span<'static> {
     let s = if selected { "❯ " } else { "  " };
-    Span::styled(s, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+    Span::styled(s, Style::default().fg(UI).add_modifier(Modifier::BOLD))
 }
 
 /// 列表项标签：选中时青色加粗，否则灰色。
 pub fn label(selected: bool, text: String) -> Span<'static> {
     let style = if selected {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default().fg(UI).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::Gray)
+        Style::default().fg(INACTIVE)
     };
     Span::styled(text, style)
 }

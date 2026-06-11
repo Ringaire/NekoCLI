@@ -174,11 +174,18 @@ pub fn handle(text: &str, skills: &SkillRegistry) -> CommandOutcome {
         }
         // 列表在主循环里异步执行（需读盘）。
         "sessions" => CommandOutcome::Handled,
-        "resume" => match Uuid::parse_str(rest) {
-            Ok(id) => CommandOutcome::Resume(id),
-            Err(_) => {
-                println!("usage: /resume <session-uuid>");
+        "resume" => {
+            if rest.is_empty() {
+                // 无参 = 打开交互式会话选择器，同 /sessions
                 CommandOutcome::Handled
+            } else {
+                match Uuid::parse_str(rest) {
+                    Ok(id) => CommandOutcome::Resume(id),
+                    Err(_) => {
+                        println!("usage: /resume <session-uuid>");
+                        CommandOutcome::Handled
+                    }
+                }
             }
         },
         "clear" => CommandOutcome::Clear,

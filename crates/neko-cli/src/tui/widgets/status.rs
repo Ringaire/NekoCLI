@@ -1,11 +1,11 @@
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::tui::theme::{mode_color, SPINNER};
+use crate::tui::theme::{mode_color, SPINNER, ERR, WARN, MUTED};
 
 /// Render the status bar.
 ///
@@ -51,15 +51,15 @@ pub fn render_status(
             pct,
         );
         let c = if pct >= 85.0 {
-            Color::Red
+            ERR
         } else if pct >= 70.0 {
-            Color::Yellow
+            WARN
         } else {
-            Color::DarkGray
+            MUTED
         };
         (s, c)
     } else {
-        ("Tab:mode ".to_string(), Color::DarkGray)
+        ("Tab:mode ".to_string(), MUTED)
     };
 
     // ── cwd basename ──────────────────────────────────────────────────────────
@@ -83,18 +83,18 @@ pub fn render_status(
     // ── build spans ───────────────────────────────────────────────────────────
     let mut spans = vec![
         Span::styled(mode_str,  Style::default().fg(mcolor).add_modifier(Modifier::BOLD)),
-        Span::styled(model_str, Style::default().fg(Color::DarkGray)),
-        Span::styled(cwd_str,   Style::default().fg(Color::DarkGray)),
+        Span::styled(model_str, Style::default().fg(MUTED)),
+        Span::styled(cwd_str,   Style::default().fg(MUTED)),
     ];
 
     if !center_str.is_empty() {
-        let center_color = if skip_perms { Color::Red } else { Color::DarkGray };
+        let center_color = if skip_perms { ERR } else { MUTED };
         spans.push(Span::styled(center_str, Style::default().fg(center_color)));
     }
 
     spans.push(Span::raw(" ".repeat(pad)));
     if !task_str.is_empty() {
-        spans.push(Span::styled(task_str, Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled(task_str, Style::default().fg(MUTED)));
     }
     spans.push(Span::styled(right_str, Style::default().fg(right_color)));
 

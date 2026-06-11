@@ -3,6 +3,7 @@ pub mod chat;
 pub mod input;
 pub mod markdown;
 pub mod model_picker;
+pub mod session_picker;
 pub mod permission;
 pub mod provider_setup;
 pub mod status;

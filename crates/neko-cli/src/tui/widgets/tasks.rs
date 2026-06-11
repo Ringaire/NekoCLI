@@ -5,12 +5,14 @@
 
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
 };
 use serde::Deserialize;
 use uuid::Uuid;
+
+use crate::tui::theme::{UI, MUTED, MAIN, OK, INACTIVE, ACCENT};
 
 // ── JSON 镜像（与 neko-tools::tools::todo::TodoItem 对齐）─────────────────────
 // 只取渲染用到的字段；其余键（id / priority）由 serde 默认忽略。
@@ -29,7 +31,7 @@ pub enum TodoStatus {
     Done,
 }
 
-use crate::tui::theme::ACCENT_ORANGE;
+
 
 /// 同步读取会话任务列表（文件小，按需读取即可）。
 pub fn load_todos(session_id: Uuid) -> Vec<TodoView> {
@@ -68,10 +70,10 @@ pub fn render(todos: &[TodoView]) -> Paragraph<'static> {
 
     let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(vec![
-        Span::styled("Tasks", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled("Tasks", Style::default().fg(UI).add_modifier(Modifier::BOLD)),
         Span::styled(
             format!("  {} pending · {} in progress · {} done", pending, in_progress, done),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(MUTED),
         ),
     ]));
 
@@ -79,18 +81,18 @@ pub fn render(todos: &[TodoView]) -> Paragraph<'static> {
         let (icon, icon_color, text_style) = match t.status {
             TodoStatus::Done => (
                 "✔",
-                Color::Green,
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::CROSSED_OUT),
+                OK,
+                Style::default().fg(MUTED).add_modifier(Modifier::CROSSED_OUT),
             ),
             TodoStatus::InProgress => (
                 "◼",
-                ACCENT_ORANGE,
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                ACCENT,
+                Style::default().fg(MAIN).add_modifier(Modifier::BOLD),
             ),
             TodoStatus::Pending => (
                 "◻",
-                Color::Gray,
-                Style::default().fg(Color::Gray),
+                INACTIVE,
+                Style::default().fg(INACTIVE),
             ),
         };
         lines.push(Line::from(vec![

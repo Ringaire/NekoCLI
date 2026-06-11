@@ -1,9 +1,11 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Clear, Paragraph},
 };
+
+use crate::tui::theme::{UI, MUTED, OK};
 
 use super::core::scroll_list::{anchor_above, label, pointer, ScrollList};
 
@@ -65,13 +67,13 @@ impl ModelPickerModal {
     }
 
     pub fn render(&self) -> Paragraph<'static> {
-        let dim = Style::default().fg(Color::DarkGray);
+        let dim = Style::default().fg(MUTED);
 
         if self.models.is_empty() {
             return Paragraph::new(vec![
                 Line::from(vec![
-                    Span::styled("Switch Model", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!("  —  {}", self.provider), Style::default().fg(Color::Cyan)),
+                    Span::styled("Switch Model", Style::default().fg(UI).add_modifier(Modifier::BOLD)),
+                    Span::styled(format!("  —  {}", self.provider), Style::default().fg(UI)),
                 ]),
                 Line::from(Span::styled(format!("No models available for {}", self.provider), dim)),
                 Line::from(Span::styled("Esc to cancel", dim)),
@@ -80,8 +82,8 @@ impl ModelPickerModal {
 
         let mut lines: Vec<Line<'static>> = vec![
             Line::from(vec![
-                Span::styled("Switch Model", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("  —  {}", self.provider), Style::default().fg(Color::Cyan)),
+                Span::styled("Switch Model", Style::default().fg(UI).add_modifier(Modifier::BOLD)),
+                Span::styled(format!("  —  {}", self.provider), Style::default().fg(UI)),
             ]),
             Line::from(Span::styled(
                 format!("{} models  •  ↑↓ navigate  Enter select  Esc cancel", self.models.len()),
@@ -93,7 +95,7 @@ impl ModelPickerModal {
         lines.extend(self.list.render_rows(&self.models, dim, move |m, rs| {
             let mut spans = vec![pointer(rs.selected), label(rs.selected, m.display_name.clone())];
             if m.id == active {
-                spans.push(Span::styled(" ◀", Style::default().fg(Color::Green)));
+                spans.push(Span::styled(" ◀", Style::default().fg(OK)));
             }
             Line::from(spans)
         }));

@@ -5,10 +5,12 @@
 
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
 };
+
+use crate::tui::theme::MUTED;
 
 use super::core::scroll_list::{anchor_above, label, pointer};
 use crate::repl::commands::Suggestion;
@@ -45,7 +47,7 @@ pub fn render(items: &[Suggestion], selected: usize) -> Paragraph<'static> {
     if start > 0 {
         lines.push(Line::from(Span::styled(
             format!("  ↑ {} more", start),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(MUTED),
         )));
     }
 
@@ -54,20 +56,20 @@ pub fn render(items: &[Suggestion], selected: usize) -> Paragraph<'static> {
         lines.push(Line::from(vec![
             pointer(selected_row),
             label(selected_row, format!("{:<16}", it.label)),
-            Span::styled(it.description.clone(), Style::default().fg(Color::DarkGray)),
+            Span::styled(it.description.clone(), Style::default().fg(MUTED)),
         ]));
     }
 
     if end < n {
         lines.push(Line::from(Span::styled(
             format!("  ↓ {} more", n - end),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(MUTED),
         )));
     }
 
     lines.push(Line::from(Span::styled(
         "  ↑↓ navigate · Tab accept · Esc dismiss",
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+        Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
     )));
 
     Paragraph::new(lines)

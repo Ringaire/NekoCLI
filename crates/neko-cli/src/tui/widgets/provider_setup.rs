@@ -13,6 +13,8 @@ use ratatui::{
 
 use neko_providers::ProviderKind;
 
+use crate::tui::theme::{UI, MUTED, ERR};
+
 use super::core::scroll_list::{anchor_above, label, pointer, ScrollList};
 
 const VISIBLE:       usize = 9;
@@ -351,9 +353,9 @@ impl ProviderSetupModal {
             SetupStep::CustomName     => self.render_input("Custom Provider", "step 1 / 3", "Name", false, "Enter to continue  Esc to cancel"),
             SetupStep::CustomUrl      => self.render_input("Custom Provider", "step 2 / 3", "Base URL", false, "Enter to continue  Esc to go back"),
             SetupStep::CustomKey      => self.render_input("Custom Provider", "step 3 / 3", "API Key", true, "Enter to skip / continue  Esc to go back"),
-            SetupStep::FetchingModels => Self::render_status("Fetching models…", Color::Cyan, "please wait"),
-            SetupStep::Saving         => Self::render_status("Saving…", Color::Cyan, ""),
-            SetupStep::Error          => Self::render_status(&format!("✗ {}", self.status), Color::Red, "Enter to retry  Esc to cancel"),
+            SetupStep::FetchingModels => Self::render_status("Fetching models…", UI, "please wait"),
+            SetupStep::Saving         => Self::render_status("Saving…", UI, ""),
+            SetupStep::Error          => Self::render_status(&format!("✗ {}", self.status), ERR, "Enter to retry  Esc to cancel"),
         }
     }
 
@@ -365,9 +367,9 @@ impl ProviderSetupModal {
     }
 
     fn render_provider_list(&self) -> Paragraph<'static> {
-        let dim = Style::default().fg(Color::DarkGray);
+        let dim = Style::default().fg(MUTED);
         let mut lines: Vec<Line<'static>> = vec![
-            Line::from(Span::styled("Connect Provider", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("Connect Provider", Style::default().fg(UI).add_modifier(Modifier::BOLD))),
             Line::from(Span::styled("↑↓ navigate  Enter select  Esc cancel", dim)),
         ];
         lines.extend(self.prov_list.render_rows(&self.providers, dim, |row, rs| {
@@ -382,11 +384,11 @@ impl ProviderSetupModal {
     }
 
     fn render_model_list(&self) -> Paragraph<'static> {
-        let dim = Style::default().fg(Color::DarkGray);
+        let dim = Style::default().fg(MUTED);
         let mut lines: Vec<Line<'static>> = vec![
             Line::from(vec![
-                Span::styled("Select Model", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("  —  {}", self.provider_id), Style::default().fg(Color::Cyan)),
+                Span::styled("Select Model", Style::default().fg(UI).add_modifier(Modifier::BOLD)),
+                Span::styled(format!("  —  {}", self.provider_id), Style::default().fg(UI)),
             ]),
             Line::from(Span::styled(
                 format!("{} models  •  ↑↓ navigate  Enter select  Esc back", self.models.len()),
@@ -410,15 +412,15 @@ impl ProviderSetupModal {
         let shown = if mask { mask_key(&self.text) } else { self.text.clone() };
         let lines: Vec<Line<'static>> = vec![
             Line::from(vec![
-                Span::styled(title.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("  {subtitle}"), Style::default().fg(Color::DarkGray)),
+                Span::styled(title.to_string(), Style::default().fg(UI).add_modifier(Modifier::BOLD)),
+                Span::styled(format!("  {subtitle}"), Style::default().fg(MUTED)),
             ]),
             Line::from(vec![
-                Span::styled(format!("{:<10}", format!("{label}:")), Style::default().fg(Color::DarkGray)),
-                Span::styled(shown, Style::default().fg(Color::Cyan)),
-                Span::styled("▏", Style::default().fg(Color::Cyan)),
+                Span::styled(format!("{:<10}", format!("{label}:")), Style::default().fg(MUTED)),
+                Span::styled(shown, Style::default().fg(UI)),
+                Span::styled("▏", Style::default().fg(UI)),
             ]),
-            Line::from(Span::styled(footer.to_string(), Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled(footer.to_string(), Style::default().fg(MUTED))),
         ];
         Paragraph::new(lines)
     }
@@ -426,7 +428,7 @@ impl ProviderSetupModal {
     fn render_status(msg: &str, color: Color, footer: &str) -> Paragraph<'static> {
         let mut lines = vec![Line::from(Span::styled(msg.to_string(), Style::default().fg(color)))];
         if !footer.is_empty() {
-            lines.push(Line::from(Span::styled(footer.to_string(), Style::default().fg(Color::DarkGray))));
+            lines.push(Line::from(Span::styled(footer.to_string(), Style::default().fg(MUTED))));
         }
         Paragraph::new(lines)
     }
