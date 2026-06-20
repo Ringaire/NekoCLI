@@ -8,6 +8,7 @@ pub mod memory;
 pub mod read_file;
 pub mod search_sessions;
 pub mod sessions;
+pub mod shell;
 pub mod todo;
 pub mod token_count;
 pub mod tree;

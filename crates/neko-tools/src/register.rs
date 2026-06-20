@@ -11,6 +11,7 @@ use crate::tools::{
     read_file::ReadFileTool,
     search_sessions::SearchSessionsTool,
     sessions::ListSessionsTool,
+    shell::ShellTool,
     todo::TodoTool,
     token_count::TokenCountTool,
     tree::TreeTool,
@@ -36,4 +37,5 @@ pub fn register_all(registry: &dyn ToolRegistry) {
     registry.register(TokenCountTool);
     registry.register(ListSessionsTool);
     registry.register(SearchSessionsTool);
+    registry.register(ShellTool);
 }

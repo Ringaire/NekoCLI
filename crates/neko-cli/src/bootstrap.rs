@@ -70,7 +70,8 @@ impl BootstrappedRuntime {
 }
 
 /// 执行完整的启动引导。
-pub async fn bootstrap(args: &Args) -> Result<BootstrappedRuntime> {
+/// `session_id`：从 CLI 解析好的 UUID（如 --resume），None 则新建会话。
+pub async fn bootstrap(args: &Args, session_id: Option<uuid::Uuid>) -> Result<BootstrappedRuntime> {
     let cwd = match &args.cwd {
         Some(p) => p.clone(),
         None    => std::env::current_dir().context("failed to get current directory")?,
@@ -122,7 +123,7 @@ pub async fn bootstrap(args: &Args) -> Result<BootstrappedRuntime> {
     let skills = Arc::new(skill_registry);
 
     // ── 8. 会话（新建或恢复）──
-    let session = match args.resume {
+    let session = match session_id {
         Some(id) => {
             session::load_session(id).await
                 .ok_or_else(|| anyhow!("session not found: {id}"))?

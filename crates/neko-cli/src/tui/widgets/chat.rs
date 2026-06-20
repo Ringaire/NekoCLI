@@ -369,7 +369,7 @@ impl ChatWidget {
                     lines.push(Line::from(""));
                 }
 
-                // ── Reasoning: `✻ Thinking… (N chars)` + 预览 ─────────────────
+                // ── Reasoning: `✻ Thinking… (N chars)` + 多行内容 ─────────────
                 BubbleKind::Reasoning => {
                     let nchars = b.content.chars().count();
                     let mut head = Vec::new();
@@ -380,16 +380,13 @@ impl ChatWidget {
                     ));
                     lines.push(Line::from(head));
 
-                    let preview: String = b.content.replace('\n', " ").chars().take(120).collect();
-                    if !preview.trim().is_empty() {
-                        let mut s2 = Vec::new();
-                        lead(&mut s2);
-                        s2.push(Span::raw("  "));
-                        s2.push(Span::styled(
-                            format!("{}…", preview),
-                            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
-                        ));
-                        lines.push(Line::from(s2));
+                    let cw = width.saturating_sub(indent_w + 2);
+                    for wline in wrap_text(&b.content, cw) {
+                        let mut s = Vec::new();
+                        lead(&mut s);
+                        s.push(Span::raw("  "));
+                        s.push(Span::styled(wline, Style::default().fg(MUTED).add_modifier(Modifier::ITALIC)));
+                        lines.push(Line::from(s));
                     }
                 }
 
