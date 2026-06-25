@@ -7,6 +7,7 @@ members = [
     "crates/neko-tools",
     "crates/neko-mcp",
     "crates/neko-skills",
+    "crates/neko-engine",
     "crates/neko-cli",
 ]
 
@@ -64,6 +65,8 @@ rand           = "0.9"
 bytes          = "1"
 notify         = "6"
 base64         = "0.22"
+axum           = { version = "0.8", features = ["ws"] }
+tokio-tungstenite = "0.24"
 
 # crate 内部依赖
 neko-core      = { path = "crates/neko-core" }

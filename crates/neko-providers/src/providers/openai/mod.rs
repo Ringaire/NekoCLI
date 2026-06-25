@@ -1,3 +1,17 @@
+pub mod oauth;
+
+/// 该 provider 的 catalog 条目。
+pub fn catalog_entry() -> crate::catalog::CatalogEntry {
+    crate::catalog::CatalogEntry {
+        name: "OpenAI".into(),
+        kind: crate::catalog::ProviderKind::OpenAi,
+        base_url: Some("https://api.openai.com/v1".into()),
+        api_key_env: Some("OPENAI_API_KEY".into()),
+        default_model: Some("gpt-4o".into()),
+        extra_body: None,
+    }
+}
+
 use async_trait::async_trait;
 use neko_core::tools::{ContentBlock, Message, MessageRole};
 use reqwest::Client;
@@ -160,10 +174,15 @@ impl OpenAiProvider {
             body["tools"] = convert_tools(&req.tools);
         }
         if let Some(t) = req.temperature {
-            body["temperature"] = json!(t);
+            // round 到 2 位小数，避免 f32 精度溢出（某些 provider 限制小数位数）
+            body["temperature"] = json!((t as f64 * 100.0).round() / 100.0);
         }
         if req.max_tokens > 0 {
             body["max_tokens"] = json!(req.max_tokens);
+        }
+        // reasoning effort（OpenAI o-series / 智谱 GLM-5+）
+        if let Some(effort) = &req.reasoning_effort {
+            body["reasoning_effort"] = json!(effort);
         }
         // 合并 extra_body（catalog 注入的 provider 特有字段，如 Ollama 的 options.num_ctx）
         if let Some(extra) = &self.extra_body {

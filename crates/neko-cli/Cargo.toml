@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 neko-core      = { workspace = true }
+neko-engine    = { path = "../neko-engine" }
 neko-providers = { workspace = true }
 neko-tools     = { workspace = true }
 neko-mcp       = { workspace = true }
@@ -35,5 +36,7 @@ tracing        = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender   = { workspace = true }
 unicode-width  = { workspace = true }
+pulldown-cmark = "0.13"
 parking_lot    = { workspace = true }
 notify         = { workspace = true }
+axum           = { workspace = true }
