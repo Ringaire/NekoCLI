@@ -101,6 +101,63 @@ impl InputWidget {
         };
     }
 
+    /// 多行光标上移：跳到上一行相同列（字符列）。
+    pub fn move_up(&mut self) {
+        let before = &self.value[..self.cursor_pos];
+        let cur_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        if cur_line_start == 0 {
+            return; // 第一行
+        }
+        let col_chars = self.value[cur_line_start..self.cursor_pos].chars().count();
+        let prev_end = cur_line_start - 1; // 跳过 \n
+        let prev_start = self.value[..prev_end].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        // 移到上一行的相同列（或行尾）
+        let mut new_pos = prev_start;
+        for _ in 0..col_chars {
+            if let Some(c) = self.value[new_pos..prev_end].chars().next() {
+                new_pos += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        self.cursor_pos = new_pos;
+    }
+
+    /// 多行光标下移：跳到下一行相同列。
+    pub fn move_down(&mut self) {
+        let before = &self.value[..self.cursor_pos];
+        let cur_line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let col_chars = self.value[cur_line_start..self.cursor_pos].chars().count();
+        let after = &self.value[self.cursor_pos..];
+        let nl_rel = match after.find('\n') {
+            None => return, // 最后一行
+            Some(i) => i,
+        };
+        let next_start = self.cursor_pos + nl_rel + 1;
+        let next_end = self.value[next_start..]
+            .find('\n')
+            .map(|i| next_start + i)
+            .unwrap_or(self.value.len());
+        // 移到下一行的相同列（或行尾）
+        let mut new_pos = next_start;
+        for _ in 0..col_chars {
+            if new_pos >= next_end {
+                break;
+            }
+            if let Some(c) = self.value[new_pos..next_end].chars().next() {
+                new_pos += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        self.cursor_pos = new_pos;
+    }
+
+    /// 输入框是否包含换行（多行）。
+    pub fn is_multiline(&self) -> bool {
+        self.value.contains('\n')
+    }
+
     // ── 状态 ──────────────────────────────────────────────────────────────────
 
     pub fn set(&mut self, text: String) {

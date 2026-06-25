@@ -1165,10 +1165,46 @@ async fn handle_key(
         }
         KeyCode::Up if alt => { state.chat.scroll_up(3); }
         KeyCode::Down if alt => { state.chat.scroll_down(3); }
+        // Ctrl+↑↓ 切换子 agent 视图
+        KeyCode::Up if ctrl => {
+            let ids = sub_agent_ids(&state.chat);
+            if !ids.is_empty() {
+                let next = match state.active_sub_agent {
+                    None => Some(ids[ids.len() - 1]),
+                    Some(id) => {
+                        if let Some(pos) = ids.iter().position(|x| *x == id) {
+                            if pos > 0 { Some(ids[pos - 1]) } else { None }
+                        } else {
+                            Some(ids[ids.len() - 1])
+                        }
+                    }
+                };
+                state.active_sub_agent = next;
+            }
+        }
+        KeyCode::Down if ctrl => {
+            let ids = sub_agent_ids(&state.chat);
+            if !ids.is_empty() {
+                let next = match state.active_sub_agent {
+                    None => Some(ids[0]),
+                    Some(id) => {
+                        if let Some(pos) = ids.iter().position(|x| *x == id) {
+                            if pos + 1 < ids.len() { Some(ids[pos + 1]) } else { None }
+                        } else {
+                            Some(ids[0])
+                        }
+                    }
+                };
+                state.active_sub_agent = next;
+            }
+        }
         KeyCode::Up => {
             if !state.suggestions.is_empty() {
                 let n = state.suggestions.len();
                 state.suggestion_idx = (state.suggestion_idx + n - 1) % n;
+            } else if !state.input.is_empty() {
+                // 输入框有内容：多行光标上移
+                state.input.move_up();
             } else if let Some(prev) = history.prev() {
                 state.input.set(prev);
             }
@@ -1177,22 +1213,9 @@ async fn handle_key(
             if !state.suggestions.is_empty() {
                 let n = state.suggestions.len();
                 state.suggestion_idx = (state.suggestion_idx + 1) % n;
-            } else if state.is_running || state.active_sub_agent.is_some() {
-                // 运行中或已在子 agent 视图中：循环切换子 agent 视图
-                let ids = sub_agent_ids(&state.chat);
-                if !ids.is_empty() {
-                    let next = match state.active_sub_agent {
-                        None => Some(ids[0]),
-                        Some(id) => {
-                            if let Some(pos) = ids.iter().position(|x| *x == id) {
-                                if pos + 1 < ids.len() { Some(ids[pos + 1]) } else { None }
-                            } else {
-                                Some(ids[0])
-                            }
-                        }
-                    };
-                    state.active_sub_agent = next;
-                }
+            } else if !state.input.is_empty() {
+                // 输入框有内容：多行光标下移
+                state.input.move_down();
             } else if let Some(next) = history.next() {
                 state.input.set(next);
             }
