@@ -307,9 +307,16 @@ impl AgentExecutor {
                     preview:     Some(tp.summary.as_str()),
                 };
                 let mut action = perms.evaluate(&check);
-                // 读取类工具访问 cwd 之外的路径时，强制升级为 Ask
-                // （--dangerously-skip-permissions 时不升级，彻底跳过审批）
+                // cwd 外路径检查仅在受限模式（ask/edit/plan）下生效；
+                // build / agent 模式全自动放行，不做 cwd 边界检查。
+                let restricted = matches!(
+                    perms.mode(),
+                    neko_core::permissions::ModeName::Ask
+                        | neko_core::permissions::ModeName::Edit
+                        | neko_core::permissions::ModeName::Plan
+                );
                 if action == PermissionAction::Allow
+                    && restricted
                     && !perms.is_permissions_skipped()
                     && is_outside_cwd(tool_name, &input, &self.cwd)
                 {
@@ -541,6 +548,7 @@ const FILE_READ_TOOLS: &[&str] = &["read_file", "glob", "grep", "tree"];
 
 /// 检查工具操作的路径是否超出 cwd 范围。
 /// 只对 FILE_READ_TOOLS 生效；glob/grep 使用 pattern/path 字段。
+/// canonicalize 失败时放宽（返回 false）——避免符号链接等场景下误判。
 fn is_outside_cwd(tool_name: &str, input: &serde_json::Value, cwd: &std::path::Path) -> bool {
     if !FILE_READ_TOOLS.contains(&tool_name) {
         return false;
@@ -554,9 +562,10 @@ fn is_outside_cwd(tool_name: &str, input: &serde_json::Value, cwd: &std::path::P
     }
     let pb = std::path::Path::new(raw);
     let resolved = if pb.is_absolute() { pb.to_path_buf() } else { cwd.join(pb) };
-    // canonicalize 失败（路径不存在）时退保守：视为在外部，要求审批
-    let canon = resolved.canonicalize().unwrap_or(resolved);
-    let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
-    !canon.starts_with(&cwd_canon)
+    // 两者都必须 canonicalize 成功才能可靠比较；任一失败则放宽（视为 cwd 内）
+    match (resolved.canonicalize(), cwd.canonicalize()) {
+        (Ok(canon), Ok(cwd_canon)) => !canon.starts_with(&cwd_canon),
+        _ => false,
+    }
 }
 
