@@ -4,6 +4,8 @@
 
 **终端 AI 编程助手 — 开源、多 Provider、可编排**
 
+[English](README_EN.md) | 简体中文
+
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Ringaire/NekoCLI)
 [![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-orange.svg)](LICENSE)

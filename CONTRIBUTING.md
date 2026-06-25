@@ -1,5 +1,7 @@
 # 贡献指南
 
+[English](CONTRIBUTING_EN.md) | 简体中文
+
 感谢你对 NekoCLI 的兴趣！本文档说明如何参与开发。
 
 ---

@@ -4,6 +4,8 @@
 
 **Terminal AI coding agent — open source, multi-provider, orchestrable**
 
+English | [简体中文](README.md)
+
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Ringaire/NekoCLI)
 [![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-orange.svg)](LICENSE)
