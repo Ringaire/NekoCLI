@@ -486,7 +486,7 @@ fn build_orchestrator_executor(
         runtime.model.clone(),
         runtime.session.meta.id,
         runtime.cwd.clone(),
-        runtime.config.session.max_tokens,
+        neko_providers::provider::DEFAULT_MAX_OUTPUT_TOKENS as u64,
         provider,
         perm_tx,
     )

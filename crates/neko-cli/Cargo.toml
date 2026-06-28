@@ -27,7 +27,6 @@ thiserror      = { workspace = true }
 anyhow         = { workspace = true }
 clap           = { workspace = true }
 ratatui        = { workspace = true }
-tui-markdown   = { workspace = true }
 crossterm      = { workspace = true }
 uuid           = { workspace = true }
 ignore         = { workspace = true }
